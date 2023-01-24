@@ -10,7 +10,8 @@ app.use(bodyParser.urlencoded({ extended: true }))
 
 //Mongoose
 const mongoose = require("mongoose")
-const md5 = require("md5")
+const bcrypt = require("bcrypt")
+const rounds = 10
 const Users = require("./user")
 mongoose.set("strictQuery", false)
 mongoose.connect("mongodb://localhost/secretsDB")
@@ -31,19 +32,23 @@ app.get("/login", (request, respond) => {
 //APP:POST
 
 app.post("/register", async function(request, respond) {
-    
-    Users.create({ email: request.body.username, password: md5(request.body.password) }, function(err) {
-        if (err) return console.error(err.message)
-        respond.render("secrets")
+    bcrypt.hash(request.body.password, rounds, function(bycryptError, hash){
+        if (bycryptError) return console.error(bycryptError.message)
+        Users.create({ email: request.body.username, password: hash }, function(mongooseError) {
+            if (mongooseError) return console.error(mongooseError.message)
+            respond.render("secrets")
+        })
     })
-
 })
 
 app.post("/login", function(request, respond) {
-    Users.findOne( { email: request.body.username } , function(err, usr){
-        if (err) return console.error(err.message)
+    
+    Users.findOne( { email: request.body.username } , function(mongooseError, usr){
+        if (mongooseError) return console.error(mongooseError.message)
         if (!usr) return //Not found
-        if (usr.password === md5(request.body.password)) return respond.render("secrets")
+        bcrypt.compare(request.body.password, usr.password, function(bycryptError, bcryptResponse){
+            if (bcryptResponse === true) { respond.render("secrets") }
+        })
     })
 })
 
